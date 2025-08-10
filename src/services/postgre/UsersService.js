@@ -100,7 +100,20 @@ export class UsersService {
       throw new AuthenticationError("Kredensial yang anda berikan salah");
     }
 
+    //* Update last_login
+    await this.updateLastLogin(id);
+
     return id;
+  }
+
+  async updateLastLogin(userId) {
+    const now = new Date().toISOString();
+
+    const query = {
+      text: 'UPDATE users SET last_login = $1 WHERE id = $2',
+      values: [now, userId],
+    };
+    await this._pool.query(query);
   }
 
   async verifyUser({ userId }) {
