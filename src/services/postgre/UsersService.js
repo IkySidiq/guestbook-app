@@ -28,7 +28,7 @@ export class UsersService {
 
       const query = {
         text: `
-          INSERT INTO users (id, name, position, username, hashed_password, created_at, updated_at)
+          INSERT INTO users (id, name, position, username, password_hash, created_at, updated_at)
           VALUES ($1, $2, $3, $4, $5, $6, $7)
           RETURNING id
         `,
@@ -84,7 +84,7 @@ export class UsersService {
 
   async verifyUserCredential({ username, password }) {
     const query = {
-      text: `SELECT id, hashed_password FROM users WHERE username = $1`,
+      text: `SELECT id, password_hash FROM users WHERE username = $1`,
       values: [username]
     }
 
@@ -93,7 +93,7 @@ export class UsersService {
       throw new AuthenticationError("Kredensial yang anda berikan salah");
     }
 
-    const { id, hashed_password: hashedPassword  } = result.rows[0];
+    const { id, password_hash: hashedPassword  } = result.rows[0];
     const match = await bcrypt.compare(password, hashedPassword);
 
     if (!match) {
@@ -203,6 +203,7 @@ export class UsersService {
     const createdAt = new Date().toISOString();
     const updatedAt = createdAt;
 
+
     const client = await this._pool.connect();
     try{
       const hashedPassword = await bcrypt.hash(password, 10)
@@ -210,7 +211,7 @@ export class UsersService {
       await client.query('BEGIN');
       
       const query = {
-        text: `UPDATE users SET name = $1, position = $2, username = $3, hashed_password = $4, updated_at = $5 WHERE id = $6 RETURNING id`,
+        text: `UPDATE users SET name = $1, position = $2, username = $3, password_hash = $4, updated_at = $5 WHERE id = $6 RETURNING id`,
         values: [name, position, username, hashedPassword, updatedAt, targetId]
       }
 
@@ -231,7 +232,7 @@ export class UsersService {
         values: [activeLogId, userId, "edit", "users", resultTargetId, createdAt],
       };
 
-      const resultOfLogQuery = await this._pool.query(activeLogsQuery);
+      const resultOfLogQuery = await client.query(activeLogsQuery);
 
       if (!resultOfLogQuery.rows.length) {
         throw new InvariantError("Gagal mencatat log aktivitas");
@@ -304,6 +305,7 @@ export class UsersService {
   }
 
   async getRole({ userId }) {
+
     const query = {
       text: `SELECT role FROM users WHERE id = $1`,
       values: [userId]

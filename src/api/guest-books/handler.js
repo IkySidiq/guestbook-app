@@ -1,4 +1,5 @@
 import autoBind from "auto-bind";
+import { InvariantError } from "../../exceptions/InvariantError.js";
 
 export class GuestBooksHandler {
   constructor ({ service, usersService, validator }) {
@@ -12,17 +13,16 @@ export class GuestBooksHandler {
 
   async postGuestBookHandler(request, h) {
     try {
-      const { address, purpose, institution, totalGuest, members, contactInfo } = request.payload;
-
-      if (!Array.isArray(members) || members.length !== totalGuest) {
-        throw new InvariantError('Jumlah anggota tidak sesuai dengan total tamu');
+      const { address, purpose, institution, members, contactInfo } = request.payload;
+      if (!Array.isArray(members)) {
+        throw new InvariantError('Data harus berupa array');
       }
 
-      await this._validator.validateGuestBookPayload({ address, purpose, institution, totalGuest, contactInfo });
+      await this._validator.validateGuestBookPayload({ address, purpose, institution, contactInfo, members });
 
-      const { id: userId } = request.auth;
+      const { id: userId } = request.auth.credentials;
 
-      const { id, logId } = await this._service.addGuestBook({ userId, address, purpose, institution, totalGuest, contactInfo });
+      const { id, logId } = await this._service.addGuestBook({ userId, address, purpose, institution, contactInfo, members });
 
       const memberIds = [];
       for (const { name } of members) {
@@ -59,8 +59,8 @@ export class GuestBooksHandler {
 
   async getGuestBookByIdHandler(request) {
     try {
-      const { id: targetId } = request.params;
-      const { data } = await this._service.getBookId({ targetId });
+      const { targetId } = request.params;
+      const data = await this._service.getBookById({ targetId });
 
       return {
         status: "success",
@@ -73,16 +73,16 @@ export class GuestBooksHandler {
 
   async editGuestBookHandler(request) {
     try{
-      const { address, purpose, institution, totalGuest } = request.payload;
-      await this._validator.guestBookValidator({ address, purpose, institution, totalGuest });
+      const { address, purpose, institution, contactInfo, members } = request.payload;
+      await this._validator.validateGuestBookPayload({ address, purpose, institution, contactInfo, members });
       
-      const { id: targetId } = request.params;
-      const { id: userId } = request.auth;
-      const { role } = await this._usersService.getRole({ userId })
-      await this._service.verifyUser({ role });
+      const { targetId } = request.params;
+      const { id: userId } = request.auth.credentials;
 
+      await this._usersService.getRole({ userId })
+      await this._usersService.verifyUser({ userId });
 
-      const { id, logId } = await this._service.editBook({ targetId, userId, address, purpose, institution, totalGuest });
+      const { id, logId } = await this._service.editBook({ targetId, userId, address, purpose, institution });
 
       return {
       status: "success",
@@ -96,14 +96,13 @@ export class GuestBooksHandler {
     }
   }
 
-  
   async deleteGuestBookHandler(request) {
     try{
-      const { id: targetId } = request.params;
-      const { id: userId } = request.auth;
+      const { targetId } = request.params;
+      const { id: userId } = request.auth.credentials;
 
-      const { role } = await this._usersService.getRole({ userId })
-      await this._service.verifyUser({ role });
+      await this._usersService.getRole({ userId });
+      await this._usersService.verifyUser({ userId });
       
       const { id, logId } = await this._service.deleteBook({targetId, userId});
 
@@ -121,12 +120,13 @@ export class GuestBooksHandler {
 
   async finishGuestBookHandler(request, h) {
     try {
-      const { id: targetId } = request.params;
-      const { id: userId } = request.auth;
+      const { targetId } = request.params;
+      const { id: userId } = request.auth.credentials;
 
-      const { role } = await this._usersService.getRole({ userId });
-      await this._service.verifyUser({ role });
+      await this._usersService.getRole({ userId });
+      await this._usersService.verifyUser({ userId });
 
+      
       const { id, logId } = await this._service.finishGuestBook({ targetId, userId });
 
       return h.response({
@@ -142,13 +142,12 @@ export class GuestBooksHandler {
     try {
       const { id: guestId } = request.params;
       const { members } = request.payload;
-      const { totalGuest } = request.payload;
 
-      if (!Array.isArray(members) || members.length !== totalGuest) {
-        throw new InvariantError('Jumlah anggota tidak sesuai dengan total tamu');
+      if (!Array.isArray(members)) {
+        throw new InvariantError('Payload anggota tamu harus berupa array');
       }
-
-      await this._service.addGuestMembersBulk({ guestId, members, totalGuest });
+      console.log(guestId);
+      await this._service.addGuestMembersBulk({ guestId, members });
 
       return h.response({
         status: "success",

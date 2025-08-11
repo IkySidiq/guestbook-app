@@ -3,6 +3,9 @@ export const routes = (handler) => [
     method: 'POST',
     path: '/reservations',
     handler: handler.postReservationHandler,
+    options: {
+      auth: 'bukutamu_jwt',
+    },
   },
   {
     method: 'GET',

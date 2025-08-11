@@ -11,12 +11,11 @@ export class ReservationsHandler{
 
   async postReservationHandler(request, h) {
     try{
-      const { name, contactInfo, purpose, institution, reservationDate } = request.payload;
+      const { name, contactInfo, purpose, institution, reservationDate, address } = request.payload;
+      await this._validator.validateReservationPayload({ name, contactInfo, purpose, institution, reservationDate, address });
 
-      await this._validator.validateReservationPayload({ name, contactInfo, purpose, institution, reservationDate });
-
-      const { id: userId } = request.auth;
-      const { id, logId } = await this._service.addReservation({ userId, name, contactInfo, purpose, institution, reservationDate })
+      const { id: userId } = request.auth.credentials;
+      const { id, logId } = await this._service.addReservation({ userId, name, contactInfo, purpose, institution, reservationDate, address })
     
     return h.response({
       status: 'success',
@@ -24,7 +23,7 @@ export class ReservationsHandler{
         id,
         logId
       }
-    })
+    }).code(201);
     } catch(error) {
       throw error
     }
@@ -60,16 +59,15 @@ export class ReservationsHandler{
 
   async editReservationHandler(request) {
     try{
-      const { name, contactInfo, purpose, institution, reservationDate } = request.payload;
-      await this._validator.guestBookValidator({ name, contactInfo, purpose, institution, reservationDate });
-      
+      const { name, contactInfo, purpose, institution, reservationDate, address } = request.payload;
+      await this._validator.validateReservationPayload({ name, contactInfo, purpose, institution, reservationDate, address });
+
       const { id: targetId } = request.params;
-      const { id: userId } = request.auth;
-      const { role } = await this._usersService.getRole({ userId }) //! DI RESERVATIONS SERVICE BELUM ADA GETROLE
-      await this._service.verifyUser({ role });
+      const { id: userId } = request.auth.credentials;
+      await this._usersService.getRole({ userId });
+      await this._usersService.verifyUser({ userId });
 
-
-      const { id, logId } = await this._service.editBook({ targetId, userId, address, purpose, institution, totalGuest });
+      const { id, logId } = await this._service.editReservation({ targetId, userId, name, contactInfo, purpose, institution, reservationDate, address });
 
       return {
       status: "success",
@@ -86,10 +84,10 @@ export class ReservationsHandler{
   async deleteReservationHandler(request) {
     try{
       const { id: targetId } = request.params;
-      const { id: userId } = request.auth;
+      const { id: userId } = request.auth.credentials;
 
-      const { role } = await this._usersService.getRole({ userId });
-      await this._service.verifyUser({ role });
+      await this._usersService.getRole({ userId });
+      await this._usersService.verifyUser({ userId });
       
       const { id, logId } = await this._service.deleteReservation({targetId, userId});
 
@@ -108,10 +106,10 @@ export class ReservationsHandler{
   async markAsVisitedHandler(request, h) {
     try {
       const { id: reservationId } = request.params;
-      const { id: userId } = request.auth;
+      const { id: userId } = request.auth.credentials;
 
-      const { role } = await this._usersService.getRole({ userId });
-      await this._service.verifyUser({ role });
+      await this._usersService.getRole({ userId });
+      await this._usersService.verifyUser({ userId });
 
       const result = await this._service.markAsVisited({ reservationId, userId });
 

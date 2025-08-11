@@ -8,7 +8,7 @@ export class ReservationsService {
     this._pool = new Pool();
   }
 
-  async addReservation({ userId, name, contactInfo, purpose, institution, reservationDate }) {
+  async addReservation({ userId, name, contactInfo, purpose, institution, reservationDate, address }) {
     const id = `reservation-${nanoid(16)}`;
     const createdAt = new Date().toISOString();
     const updatedAt = createdAt;
@@ -19,9 +19,9 @@ export class ReservationsService {
       await client.query("BEGIN");
 
       const query = {
-        text: `INSERT INTO reservations (id, name, contact_info, purpose, institution, reservation_date, created_at, updated_at, created_by )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-        values: [id, name, contactInfo, purpose, institution, reservationDate, createdAt, updatedAt, userId],
+        text: `INSERT INTO reservations (id, name, contact_info, purpose, institution, reservation_date, created_at, updated_at, created_by, address)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+        values: [id, name, contactInfo, purpose, institution, reservationDate, createdAt, updatedAt, userId, address],
       };
 
       const result = await client.query(query);
@@ -127,16 +127,20 @@ export class ReservationsService {
         throw new NotFoundError("Reservasi tidak ditemukan");
       }
 
-      return result.rows[0];
+      return {
+        data: result.rows[0]
+      }
     } catch (error) {
       console.error("Database Error (getReservationById):", error);
       throw new Error("Gagal mengambil data reservasi");
     }
   }
 
-  async editReservation({ id, userId, name, contactInfo, purpose, institution, reservationDate }) {
+  async editReservation({ targetId, userId, name, contactInfo, purpose, institution, reservationDate, address }) {
     const createdAt = new Date().toISOString();
+    const updatedAt = createdAt;
     const activeLogId = `log-${nanoid(16)}`;
+    console.log("RESER", address)
 
     const client = await this._pool.connect();
     try {
@@ -149,10 +153,11 @@ export class ReservationsService {
                 purpose = $3,
                 institution = $4,
                 reservation_date = $5,
-                updated_at = $6
-              WHERE id = $7
+                updated_at = $6,
+                address = $7
+              WHERE id = $8
               RETURNING id`,
-        values: [name, contactInfo, purpose, institution, reservationDate, updatedAt, id],
+        values: [name, contactInfo, purpose, institution, reservationDate, updatedAt, address, targetId],
       };
 
       const result = await client.query(updateQuery);
@@ -164,7 +169,7 @@ export class ReservationsService {
       const activeLogsQuery = {
         text: `INSERT INTO active_logs (id, user_id, action, target_table, target_id, created_at)
                VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        values: [activeLogId, userId, "update", "reservations", id, createdAt],
+        values: [activeLogId, userId, "update", "reservations", targetId, createdAt],
       };
 
       const logResult = await client.query(activeLogsQuery);
@@ -187,7 +192,7 @@ export class ReservationsService {
     }
   }
 
-  async deleteReservation(id, userId) {
+  async deleteReservation({ targetId, userId }) {
     const createdAt = new Date().toISOString();
     const activeLogId = `log-${nanoid(16)}`;
 
@@ -197,7 +202,7 @@ export class ReservationsService {
 
       const deleteQuery = {
         text: `DELETE FROM reservations WHERE id = $1 RETURNING id`,
-        values: [id],
+        values: [targetId],
       };
 
       const result = await client.query(deleteQuery);
@@ -209,7 +214,7 @@ export class ReservationsService {
       const activeLogsQuery = {
         text: `INSERT INTO active_logs (id, user_id, action, target_table, target_id, created_at)
                VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        values: [activeLogId, userId, "delete", "reservations", id, createdAt],
+        values: [activeLogId, userId, "delete", "reservations", targetId, createdAt],
       };
 
       const logResult = await client.query(activeLogsQuery);
@@ -237,13 +242,14 @@ export class ReservationsService {
     const activeLogId1 = `log-${nanoid(16)}`; 
     const activeLogId2 = `log-${nanoid(16)}`; 
     const now = new Date().toISOString();
+    console.log(reservationId);
 
     try {
       await client.query('BEGIN');
 
       const getReservationQuery = {
-        text: `SELECT id, contact_info, purpose, institution, created_by, address 
-              FROM reservations WHERE id = $1 AND status != 'selesai'`,
+        text: `SELECT id, contact_info, purpose, institution, address 
+              FROM reservations WHERE id = $1 AND status != 'accepted'`,
         values: [reservationId],
       };
       const reservationResult = await client.query(getReservationQuery);
@@ -253,12 +259,13 @@ export class ReservationsService {
       }
 
       const reservation = reservationResult.rows[0];
+      console.log(reservation.contact_info);
 
       const guestBookId = `book-${nanoid(16)}`;
       const insertGuestBookQuery = {
         text: `INSERT INTO guest_books 
-              (id, address, purpose, institution, accepted_by, total_guest, check_in, created_at, updated_at, status)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, '$10')`,
+              (id, address, purpose, institution, accepted_by, total_guest, check_in, created_at, updated_at, status, contact_info)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         values: [
           guestBookId,
           reservation.address,
@@ -269,7 +276,8 @@ export class ReservationsService {
           now,
           now,
           now,
-          'sedang bertamu'
+          'sedang bertamu',
+          reservation.contact_info
         ],
       };
       await client.query(insertGuestBookQuery);
@@ -282,8 +290,8 @@ export class ReservationsService {
       await client.query(logGuestBookQuery);
 
       const updateReservationQuery = {
-        text: `UPDATE reservations SET status = 'selesai', updated_at = $1 WHERE id = $2`,
-        values: [now, reservationId],
+        text: `UPDATE reservations SET status = $1, updated_at = $2 WHERE id = $3`,
+        values: ['accepted', now, reservationId],
       };
       await client.query(updateReservationQuery);
 

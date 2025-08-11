@@ -8,7 +8,7 @@ export class UsersHandler{
     autoBind(this)
   }
 
-  async postUserHandler(request) {
+  async postUserHandler(request, h) {
     try {
       const { name, position, username, password} = request.payload;
       this._validator.validateUserPayload({ name, position, username, password });
@@ -46,9 +46,9 @@ export class UsersHandler{
     try {
       const {name, position, username, password} = request.payload;
       const { targetId } = request.params;
-      await this._validator.validateUserPayload({ name, position, username, password });
 
-      const { id: userId } = request.auth;
+      await this._validator.validateUserPayload({ name, position, username, password });
+      const { id: userId } = request.auth.credentials;
       await this._service.verifyUser({ userId });
 
       const { id, logId } = await this._service.editUser({targetId, name, position, username, password, userId});
@@ -67,8 +67,8 @@ export class UsersHandler{
 
   async deleteUserHandler(request) {
     try {
-      const { id: targetId } = request.params;
-      const { id: userId } = request.auth;
+      const { targetId } = request.params;
+      const { id: userId } = request.auth.credentials;
       await this._service.verifyUser({ userId });
 
       const { id, logId} = await this._service.deleteUser({ userId, targetId });

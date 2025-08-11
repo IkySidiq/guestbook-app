@@ -10,7 +10,7 @@ export class GuestBooksService {
     this._pool = new Pool();
   }
 
-  async addGuestBook({ userId, address, purpose, institution, totalGuest, contactInfo }) {
+  async addGuestBook({ userId, address, purpose, institution, contactInfo, members }) {
     const client = await this._pool.connect();
     
     try {
@@ -19,11 +19,12 @@ export class GuestBooksService {
     const createdAt = new Date().toISOString();
     const checkIn = createdAt;
     const updatedAt = createdAt;
+    const totalGuest = members.length;
     
     await client.query('BEGIN');
     const query = {
       text: `INSERT INTO guest_books (id, address, purpose, institution, accepted_by, total_guest, check_in, created_at, updated_at, contact_info)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
       values: [id, address, purpose, institution, userId, totalGuest, checkIn, createdAt, updatedAt, contactInfo],
     }
 
@@ -65,8 +66,8 @@ export class GuestBooksService {
 
     try {
       const query = {
-        text: `INSERT INTO guest_members (id, guest_id, name, contact_info)
-          VALUES ($1, $2, $3, $4) RETURNING id`,
+        text: `INSERT INTO guest_members (id, guest_id, name)
+          VALUES ($1, $2, $3) RETURNING id`,
         values: [id, guestId, name]
       }
 
@@ -139,9 +140,9 @@ export class GuestBooksService {
     try {
       const query = {
         text: `SELECT id, address, purpose, created_at, institution, accepted_by, status, check_out, check_in, total_guest
-          FROM guest_books WHERE id = $1`,
+              FROM guest_books WHERE id = $1`,
         values: [targetId],
-      }
+      };
 
       const result = await this._pool.query(query);
 
@@ -149,28 +150,31 @@ export class GuestBooksService {
         throw new NotFoundError("Buku tidak ditemukan");
       }
 
-      return  result.rows[0]
+      return result.rows[0];
     } catch (error) {
-        console.error("Database Error (getBookById):", error);
-        throw new Error("Gagal mengambil data tamu");
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      console.error("Database Error (getBookById):", error);
+      throw new Error("Gagal mengambil data tamu");
     }
   }
 
-  async editBook({ targetId, userId, address, purpose, institution, totalGuest }) {
+  async editBook({ targetId, userId, address, purpose, institution }) {
     const activeLogId = `log-${nanoid(16)}`;
     const createdAt = new Date().toISOString();
     const updatedAt = createdAt;
     const client = await this._pool.connect();
 
-    try {      
+    try {
       await client.query('BEGIN');
 
       const query = {
-        text: 'UPDATE guest_books SET address = $1, purpose = $2, institution = $3, total_guest = $4, updated_at = $5 WHERE id = $6 RETURNING id',
-        values: [address, purpose, institution, totalGuest, updatedAt, targetId]
+        text: 'UPDATE guest_books SET address = $1, purpose = $2, institution = $3, updated_at = $4 WHERE id = $5 RETURNING id',
+        values: [address, purpose, institution, updatedAt, targetId]
       }
-
       const result = await client.query(query);
+      console.log(result.rows);
 
       if (!result.rows.length) {
         throw new InvariantError("Data tidak ditemukan. Gagal mengedit buku tamu");
@@ -307,22 +311,31 @@ export class GuestBooksService {
     }
   }
 
-  async addGuestMembersBulk({ guestId, members, totalGuest }) {
+  async addGuestMembersBulk({ guestId, members }) {
     const client = await this._pool.connect();
+    const now = new Date().toISOString();
 
     try {
       await client.query('BEGIN');
 
+      // Insert guest members
       for (const member of members) {
         const id = `member-${nanoid(16)}`;
         const query = {
-          text: `INSERT INTO guest_members (id, guest_id, name, total_guest)
-                VALUES ($1, $2, $3, $4)`,
-          values: [id, guestId, member.name, totalGuest],
+          text: `INSERT INTO guest_members (id, guest_id, name)
+                VALUES ($1, $2, $3)`,
+          values: [id, guestId, member.name],
         };
-
         await client.query(query);
       }
+
+      const totalGuest = members.length;
+
+      const updateTotalGuestQuery = {
+        text: `UPDATE guest_books SET total_guest = $1, updated_at = $2 WHERE id = $3`,
+        values: [totalGuest, now, guestId],
+      };
+      await client.query(updateTotalGuestQuery);
 
       await client.query('COMMIT');
     } catch (error) {

@@ -3,11 +3,19 @@ export const routes = (handler) => [
     method: 'POST',
     path: '/guest-book',
     handler: handler.postGuestBookHandler,
+    options: {
+      auth: 'bukutamu_jwt',
+    },
   },
   {
     method: 'GET',
     path: '/guest-book',
     handler: handler.getGuestBookHandler,
+  },
+    {
+    method: 'GET',
+    path: '/guest-book/{targetId}',
+    handler: handler.getGuestBookByIdHandler,
   },
   {
     method: 'PUT',
@@ -35,7 +43,7 @@ export const routes = (handler) => [
   },
   {
     method: 'POST',
-    path: '/guest-book/{guestId}/members/bulk',
+    path: '/guest-book/{id}/members/bulk',
     handler: handler.addGuestMembersBulkHandler,
     options: {
       auth: 'bukutamu_jwt',

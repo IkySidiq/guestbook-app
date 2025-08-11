@@ -14,6 +14,7 @@ import { authentications } from './api/authentications/index.js';
 import { AuthenticationsService } from './services/postgre/AuthenticationsService.js';
 import { AuthenticationsValidator } from './validators/authentications/index.js';
 import { users } from './api/users/index.js';
+import { TokenManager } from './tokenize/TokenManager.js'
 
 //Guest Books
 import { GuestBooksService } from './services/postgre/GuestBooksService.js';
@@ -70,7 +71,9 @@ const init = async() => {
     {
       plugin: authentications,
       options: {
-        service: authenticationsService,
+        authenticationsService,
+        usersService,
+        tokenManager: TokenManager,
         validator: AuthenticationsValidator
       }
     },

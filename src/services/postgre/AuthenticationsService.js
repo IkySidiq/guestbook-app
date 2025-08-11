@@ -9,12 +9,12 @@ export class AuthenticationsService{
     this._pool = new Pool();
   }
 
-  async addRefreshToken({ token }) {
+  async addRefreshToken({ accessToken: token }) {
     const id = `auth-${nanoid(16)}`;
 
     const query = {
-      text: `INSERT INTO authentications (id, refreshToken) VALUES ($1, $2) RETURNING id`,
-      value: [id, token]
+      text: `INSERT INTO authentications (id, refresh_token) VALUES ($1, $2) RETURNING id`,
+      values: [id, token]
     }
 
     const result = await this._pool.query(query);

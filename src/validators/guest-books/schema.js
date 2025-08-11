@@ -4,7 +4,6 @@ export const GuestBookPayloadSchema = Joi.object({
   address: Joi.string().required(),
   purpose: Joi.string().required(),
   institution: Joi.string().required(),
-  totalGuest: Joi.number().integer().required(),
   contactInfo: Joi.string().required(),
   members: Joi.array()
     .items(
