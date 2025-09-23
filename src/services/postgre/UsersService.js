@@ -197,7 +197,6 @@ export class UsersService {
     }
   }
 
-
   async editUser({ targetId, name, position, username, password, userId }) {
     const activeLogId = `log-${nanoid(16)}`;
     const createdAt = new Date().toISOString();
@@ -320,7 +319,7 @@ export class UsersService {
     return result.rows[0].role;
   }
 
-    async getPosition({ userId }) {
+  async getPosition({ userId }) {
     const query = {
       text: `SELECT position FROM users WHERE id = $1`,
       values: [userId]
